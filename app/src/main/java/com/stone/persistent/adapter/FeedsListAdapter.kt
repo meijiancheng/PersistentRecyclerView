@@ -4,12 +4,13 @@ import android.content.Context
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
+import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.RecyclerView.Adapter
 import com.stone.persistent.R
 import com.stone.persistent.model.ProductItemModel
-import kotlinx.android.synthetic.main.item_feeds_product.view.*
 
 class FeedsListAdapter(context: Context) : Adapter<FeedsListAdapter.ProductViewHolder>() {
 
@@ -87,13 +88,13 @@ class FeedsListAdapter(context: Context) : Adapter<FeedsListAdapter.ProductViewH
 
         fun bindPosition(position: Int) {
             val itemData = dataList.get(position % 6)
-            itemView.goods_title_tv.text = itemData.goodName
-            itemView.goods_imageview.setImageResource(itemData.imagRes)
-            itemView.goods_price_tv.text = itemData.price
+            itemView.findViewById<TextView>(R.id.goods_title_tv).text = itemData.goodName
+            itemView.findViewById<ImageView>(R.id.goods_imageview).setImageResource(itemData.imagRes)
+            itemView.findViewById<TextView>(R.id.goods_price_tv).text = itemData.price
 
-            val imageLp = itemView.goods_imageview.layoutParams as ConstraintLayout.LayoutParams
+            val imageLp = itemView.findViewById<ImageView>(R.id.goods_imageview).layoutParams as ConstraintLayout.LayoutParams
             imageLp.dimensionRatio = itemData.dimensionRatio.toString()
-            itemView.goods_imageview.layoutParams = imageLp
+            itemView.findViewById<ImageView>(R.id.goods_imageview).layoutParams = imageLp
         }
 
     }

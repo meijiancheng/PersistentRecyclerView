@@ -4,9 +4,9 @@ import android.os.Bundle
 import android.view.View
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.stone.persistent.R
 import com.stone.persistent.adapter.MenuGridAdapter
-import kotlinx.android.synthetic.main.fragment_menu_grid.*
 
 class MenuGridFragment : Fragment(R.layout.fragment_menu_grid) {
 
@@ -15,7 +15,8 @@ class MenuGridFragment : Fragment(R.layout.fragment_menu_grid) {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        menu_recyclerview.layoutManager = GridLayoutManager(activity, 5)
-        menu_recyclerview.adapter = MenuGridAdapter(activity!!, page)
+        val menuRecyclerView = view.findViewById<RecyclerView>(R.id.menu_recyclerview)
+        menuRecyclerView.layoutManager = GridLayoutManager(activity, 5)
+        menuRecyclerView.adapter = MenuGridAdapter(requireActivity(), page)
     }
 }

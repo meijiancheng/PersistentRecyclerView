@@ -9,7 +9,6 @@ import com.stone.persistent.adapter.FeedsListAdapter
 import com.stone.persistent.extensions.dp2px
 import com.stone.persistent.widget.GridItemDecoration
 import com.stone.persistent.widget.PersistentStaggeredGridLayoutManager
-import kotlinx.android.synthetic.main.fragment_feeds_list.*
 
 class FeedsListFragment : Fragment(R.layout.fragment_feeds_list) {
 
@@ -18,10 +17,10 @@ class FeedsListFragment : Fragment(R.layout.fragment_feeds_list) {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        this.recyclerView = this.recycler_view
+        this.recyclerView = view.findViewById(R.id.recycler_view)
         val layoutManager = PersistentStaggeredGridLayoutManager()
         this.recyclerView!!.layoutManager = layoutManager
-        this.recyclerView!!.addItemDecoration(GridItemDecoration(activity!!.dp2px(8f)))
-        this.recyclerView!!.adapter = FeedsListAdapter(activity!!)
+        this.recyclerView!!.addItemDecoration(GridItemDecoration(requireActivity().dp2px(8f)))
+        this.recyclerView!!.adapter = FeedsListAdapter(requireActivity())
     }
 }

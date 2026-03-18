@@ -1,15 +1,13 @@
 package com.stone.persistent.helper
 
 import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.appbar.AppBarLayout
-import com.scwang.smartrefresh.layout.SmartRefreshLayout
-import com.scwang.smartrefresh.layout.api.RefreshHeader
-import com.scwang.smartrefresh.layout.listener.SimpleMultiPurposeListener
+import com.stone.persistent.R
 import com.stone.persistent.MainActivity
 import com.stone.persistent.extensions.dp2px
 import com.stone.persistent.extensions.getScreenWidth
 import com.stone.persistent.extensions.getStatusBarHeight
-import kotlinx.android.synthetic.main.activity_main.*
 
 /**
  * 首页滑动帮助类
@@ -22,11 +20,11 @@ class SyncScrollHelper(mainActivity: MainActivity) {
     private var searchBarHeight = mainActivity.dp2px(46f)
 
     private val activity = mainActivity
-    private val toolBarLayout = mainActivity.main_toolbar
-    private val searchBarLayout = mainActivity.main_search_layout
-    private val backIv1 = mainActivity.main_back_img1
-    private val backIv2 = mainActivity.main_back_img2
-    private val logoImageView = mainActivity.main_top_logo
+    private val toolBarLayout = mainActivity.findViewById<ConstraintLayout>(R.id.main_toolbar)
+    private val searchBarLayout = mainActivity.findViewById<ConstraintLayout>(R.id.main_search_layout)
+    private val backIv1 = mainActivity.findViewById<android.widget.ImageView>(R.id.main_back_img1)
+    private val backIv2 = mainActivity.findViewById<android.widget.ImageView>(R.id.main_back_img2)
+    private val logoImageView = mainActivity.findViewById<android.widget.ImageView>(R.id.main_top_logo)
 
     companion object {
         private const val BACK_DIMENSION_RATIO2 = 0.992647f
@@ -50,10 +48,14 @@ class SyncScrollHelper(mainActivity: MainActivity) {
     }
 
     /**
-     * 列表滚动时，一些View位置变动
+     * 列表滚动时，一些View位置变动；同时同步控制下拉刷新的可用状态
      */
-    fun syncListScroll(appBarLayout: AppBarLayout) {
+    fun syncListScroll(appBarLayout: AppBarLayout, refreshLayout: SwipeRefreshLayout) {
+        var appBarFullyExpanded = true
+
         appBarLayout.addOnOffsetChangedListener(AppBarLayout.OnOffsetChangedListener { _, offset ->
+            appBarFullyExpanded = offset == 0
+
             val minTranslationY = statusBarHeight + activity.dp2px(9f)
             val maxTranslationY = statusBarHeight + toolbarHeight
             val targetTranslationY = maxTranslationY + offset / 2
@@ -82,54 +84,9 @@ class SyncScrollHelper(mainActivity: MainActivity) {
             layoutParams.setMargins(0, 0, (maxMarginRight * progress).toInt(),0)
             searchBarLayout.layoutParams = layoutParams
         })
+
+        // 4. AppBar 未完全展开时，视为子视图仍可上滑，阻止触发下拉刷新
+        //    loading 中 isRefreshing=true，SwipeRefreshLayout 不依赖此回调，indicator 正常显示
+        refreshLayout.setOnChildScrollUpCallback { _, _ -> !appBarFullyExpanded }
     }
-
-    /**
-     * 下拉刷新View同步处理
-     */
-    fun syncRefreshPullDown(refreshLayout: SmartRefreshLayout) {
-        val purposeListener = object : SimpleMultiPurposeListener() {
-            override fun onHeaderMoving(
-                header: RefreshHeader?,
-                isDragging: Boolean,
-                percent: Float,
-                offset: Int,
-                headerHeight: Int,
-                maxDragHeight: Int
-            ) {
-                // 监听refreshLayout位置变动
-                val backImgHeight1 = screenWidth / BACK_DIMENSION_RATIO1
-                val backImgHeight2 = screenWidth / BACK_DIMENSION_RATIO2
-                val maxTranslationY =
-                    backImgHeight1 - statusBarHeight - toolbarHeight - searchBarHeight
-
-                if (offset > maxTranslationY) {
-                    val outOfOffset = offset - maxTranslationY
-
-                    backIv1.alpha = 0f
-                    toolBarLayout.alpha = 0f
-                    searchBarLayout.alpha = 0f
-
-                    backIv1.translationY = 0f
-
-                    val translationY2 = backImgHeight2 - backImgHeight1 - outOfOffset
-                    backIv2.translationY = -translationY2
-                } else {
-                    val alpha = (maxTranslationY - offset) / maxTranslationY
-                    backIv1.alpha = alpha
-                    toolBarLayout.alpha = alpha
-                    searchBarLayout.alpha = alpha
-
-                    val translationY1 = maxTranslationY - offset
-                    backIv1.translationY = -translationY1
-
-                    val translationY2 = backImgHeight2 - backImgHeight1
-                    backIv2.translationY = -translationY2
-                }
-            }
-        }
-        refreshLayout.setOnMultiPurposeListener(purposeListener);
-    }
-
-
 }

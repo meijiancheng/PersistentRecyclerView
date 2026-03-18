@@ -2,20 +2,25 @@ package com.stone.persistent.library
 
 import android.content.Context
 import android.util.AttributeSet
+import android.util.Log
 import android.view.MotionEvent
+import android.view.ViewTreeObserver
 import androidx.coordinatorlayout.widget.CoordinatorLayout
-import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager.widget.ViewPager
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.appbar.AppBarLayout
 
 /**
- * 定制的CoordinatorLayout，第一个子View必须为AppbarLayout
- * 如果底部不用ViewPager的话，可以设置其adapter->getCount=0
+ * 持续滚动 CoordinatorLayout
+ * ---appbarLayout
+ * ---viewpager/viewpager2
+ * -------fragment
+ * -----------PersistentRecyclerView
  */
-class PersistentCoordinatorLayout @JvmOverloads constructor(
-    context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
-) : CoordinatorLayout(context, attrs, defStyleAttr) {
+private const val TAG = "PersistentCoordinator"
+
+class PersistentCoordinatorLayout: CoordinatorLayout {
 
     private lateinit var appBarLayout: AppBarLayout
 
@@ -24,18 +29,27 @@ class PersistentCoordinatorLayout @JvmOverloads constructor(
 
     private var overScroller: HookedScroller? = null
 
+    constructor(context: Context): super(context)
+    constructor(context: Context, attrs: AttributeSet?): super(context, attrs)
+    constructor(context: Context, attrs: AttributeSet?, defStyleAttr: Int): super(context, attrs, defStyleAttr)
+
     override fun onFinishInflate() {
         super.onFinishInflate()
-        if (childCount == 2 && getChildAt(0) is AppBarLayout) {
-            this.appBarLayout = getChildAt(0) as AppBarLayout
-            this.appBarLayout.viewTreeObserver.addOnGlobalLayoutListener {
-                if (overScroller == null) {
-                    hookScroller()
+        val firstChild = getChildAt(0)
+        if (childCount != 2 || firstChild !is AppBarLayout) {
+            throw RuntimeException("PersistentCoordinatorLayout's first child must be AppbarLayout")
+        }
+
+        appBarLayout = firstChild
+        val observer = appBarLayout.viewTreeObserver
+        observer.addOnGlobalLayoutListener(object : ViewTreeObserver.OnGlobalLayoutListener {
+            override fun onGlobalLayout() {
+                hookScroller()
+                if (observer.isAlive) {
+                    observer.removeOnGlobalLayoutListener(this)
                 }
             }
-        } else {
-            throw RuntimeException("CustCoordinatorLayout's first child must be AppbarLayout")
-        }
+        })
     }
 
     /**
@@ -43,20 +57,34 @@ class PersistentCoordinatorLayout @JvmOverloads constructor(
      */
     private fun hookScroller() {
         val lp = appBarLayout.layoutParams as LayoutParams
-        val behavior = lp.behavior as AppBarLayout.Behavior
+        val behavior = lp.behavior as? AppBarLayout.Behavior ?: return
         behavior.setDragCallback(PersistentCallback())
 
-        val scrollerField =
-            AppBarLayout.Behavior::class.java.superclass.superclass.getDeclaredField("scroller")
-        scrollerField.isAccessible = true
-        if (scrollerField.get(behavior) == null) {
-            // 1. 初始化HookedScroller
-            overScroller = HookedScroller(context) {
-                findCurrentChildRecyclerView()
-            }
+        try {
+            val grandParentClass = AppBarLayout.Behavior::class.java.superclass?.superclass
+                ?: return
+            val scrollerField = grandParentClass.getDeclaredField("scroller")
+            scrollerField.isAccessible = true
+            if (scrollerField.get(behavior) != null) return
 
-            // 2. 注入Scroller
-            scrollerField.set(behavior, overScroller)
+            val hookedScroller = HookedScroller(context)
+            scrollerField.set(behavior, hookedScroller)
+            overScroller = hookedScroller
+            registerOffsetListener(hookedScroller)
+        } catch (e: Exception) {
+            // 隐藏API访问失败时不崩溃，保持默认行为
+            Log.w(TAG, "hookScroller: reflection failed, velocity transfer disabled", e)
+        }
+    }
+
+    private fun registerOffsetListener(hookedScroller: HookedScroller) {
+        appBarLayout.addOnOffsetChangedListener { appBar, verticalOffset ->
+            if (verticalOffset == -appBar.totalScrollRange) {
+                val velocity = hookedScroller.consumeFlingVelocity()
+                if (velocity > 0) {
+                    findCurrentChildRecyclerView()?.fling(0, velocity)
+                }
+            }
         }
     }
 
@@ -64,7 +92,7 @@ class PersistentCoordinatorLayout @JvmOverloads constructor(
         // 手指按下时，所有scroll动画都需要停止
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
             // behavior滑动停止
-            overScroller?.clearPendingMessages()
+            overScroller?.clearPendingFling()
             overScroller?.forceFinished(true)
 
             // 底部的RecyclerView滑动停止
@@ -79,43 +107,36 @@ class PersistentCoordinatorLayout @JvmOverloads constructor(
     /**
      * 获取当前的ChildRecyclerView
      */
-    private fun findCurrentChildRecyclerView(): PersistentRecyclerView? {
-        if (innerViewPager != null) {
-            val currentItem = innerViewPager!!.currentItem
-            for (i in 0 until innerViewPager!!.childCount) {
-                val itemChildView = innerViewPager!!.getChildAt(i)
-                val layoutParams = itemChildView.layoutParams as ViewPager.LayoutParams
-                val positionField = layoutParams.javaClass.getDeclaredField("position")
-                positionField.isAccessible = true
-                val position = positionField.get(layoutParams) as Int
+    private fun findCurrentChildRecyclerView(): PersistentRecyclerView? =
+        innerViewPager?.let(::findCurrentChildInViewPager)
+            ?: innerViewPager2?.let(::findCurrentChildInViewPager2)
 
-                if (!layoutParams.isDecor && currentItem == position) {
-                    if (itemChildView is PersistentRecyclerView) {
-                        return itemChildView
-                    } else {
-                        val tagView = itemChildView?.getTag(R.id.tag_saved_child_recycler_view)
-                        if (tagView is PersistentRecyclerView) {
-                            return tagView
-                        }
-                    }
-                }
-            }
-        } else if (innerViewPager2 != null) {
-            val layoutManagerFiled = ViewPager2::class.java.getDeclaredField("mLayoutManager")
-            layoutManagerFiled.isAccessible = true
-            val pagerLayoutManager = layoutManagerFiled.get(innerViewPager2) as LinearLayoutManager
-            var currentChild = pagerLayoutManager.findViewByPosition(innerViewPager2!!.currentItem)
-
-            if (currentChild is PersistentRecyclerView) {
-                return currentChild
-            } else {
-                val tagView = currentChild?.getTag(R.id.tag_saved_child_recycler_view)
-                if (tagView is PersistentRecyclerView) {
-                    return tagView
+    private fun findCurrentChildInViewPager(viewPager: ViewPager): PersistentRecyclerView? {
+        for (i in 0 until viewPager.childCount) {
+            val itemChildView = viewPager.getChildAt(i)
+            val layoutParams = itemChildView.layoutParams as ViewPager.LayoutParams
+            if (!layoutParams.isDecor) {
+                val recyclerView = findPersistentRecyclerView(itemChildView)
+                if (recyclerView != null) {
+                    return recyclerView
                 }
             }
         }
         return null
+    }
+
+    private fun findCurrentChildInViewPager2(viewPager2: ViewPager2): PersistentRecyclerView? {
+        val rv = viewPager2.getChildAt(0) as? RecyclerView ?: return null
+        val pageView = rv.findViewHolderForAdapterPosition(viewPager2.currentItem)?.itemView
+            ?: return null
+        return findPersistentRecyclerView(pageView)
+    }
+
+    private fun findPersistentRecyclerView(view: android.view.View): PersistentRecyclerView? {
+        if (view is PersistentRecyclerView) {
+            return view
+        }
+        return view.getTag(R.id.tag_saved_child_recycler_view) as? PersistentRecyclerView
     }
 
     fun setInnerViewPager(viewPager: ViewPager?) {

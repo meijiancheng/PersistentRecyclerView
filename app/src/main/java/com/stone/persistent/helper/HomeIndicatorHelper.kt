@@ -5,8 +5,8 @@ import android.util.TypedValue
 import android.view.View
 import android.widget.TextView
 import androidx.viewpager2.widget.ViewPager2
+import com.stone.persistent.R
 import com.stone.persistent.MainActivity
-import kotlinx.android.synthetic.main.main_feeds_tabs.*
 
 class HomeIndicatorHelper(mainActivity: MainActivity) {
 
@@ -34,11 +34,11 @@ class HomeIndicatorHelper(mainActivity: MainActivity) {
         }
 
         // 3. 初始化
-        tabList.add(mainActivity.main_feeds_tab1)
-        tabList.add(mainActivity.main_feeds_tab2)
-        tabList.add(mainActivity.main_feeds_tab3)
-        tabList.add(mainActivity.main_feeds_tab4)
-        tabList.add(mainActivity.main_feeds_tab5)
+        tabList.add(mainActivity.findViewById(R.id.main_feeds_tab1))
+        tabList.add(mainActivity.findViewById(R.id.main_feeds_tab2))
+        tabList.add(mainActivity.findViewById(R.id.main_feeds_tab3))
+        tabList.add(mainActivity.findViewById(R.id.main_feeds_tab4))
+        tabList.add(mainActivity.findViewById(R.id.main_feeds_tab5))
 
         for (itemTab in tabList) {
             itemTab.setOnClickListener(tabClickListener)

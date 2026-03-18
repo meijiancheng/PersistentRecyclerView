@@ -13,7 +13,7 @@ class CarouselHelper(viewPager2: ViewPager2) : Handler(Looper.getMainLooper()) {
         private const val LOOP_INTERVAL = 3000L
     }
 
-    override fun handleMessage(msg: Message?) {
+    override fun handleMessage(msg: Message) {
         // 1. 切换到下一个item
         val nextItem = viewPager2.currentItem + 1
         viewPager2.currentItem = nextItem

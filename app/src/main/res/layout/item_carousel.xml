@@ -4,13 +4,12 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <com.rishabhharit.roundedimageview.RoundedImageView
+    <ImageView
         android:id="@+id/carousel_img"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_marginLeft="8dp"
         android:layout_marginRight="8dp"
-        android:scaleType="centerCrop"
-        app:cornerRadius="10dp" />
+        android:scaleType="centerCrop" />
 
 </FrameLayout>
